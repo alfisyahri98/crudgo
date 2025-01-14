@@ -1,35 +1,46 @@
 package utils
 
 import (
-	"context"
 	"github.com/golang-jwt/jwt/v5"
 	"time"
 )
 
-var (
-	ctx              = context.Background()
-	jwtAccessSecret  = []byte("nf12nf12niopf1if190f120")
-	jwtRefreshSecret = []byte("nf12nf12niopf1if190fd21120")
-)
+var jwtSecret = []byte("Xojf31nf323j")
 
-func GenerateAccessToken(userID string) (string, error) {
+func GenerateJWTAccessToken(userID string) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
-		"exp":     time.Now().Add(60 * time.Second).Unix(),
-		"iat":     time.Now().Unix(),
+		"exp":     time.Now().Add(3 * time.Minute).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtAccessSecret)
+	return token.SignedString(jwtSecret)
 }
 
-func GenerateRefreshToken(userID string) (string, error) {
+func GenerateJWTRefreshToken(userID string) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
-		"exp":     time.Now().Add(30 * time.Second).Unix(),
-		"iat":     time.Now().Unix(),
+		"exp":     time.Now().Add(30 * time.Minute).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
+}
+
+func ValidateToken(tokenString string) (jwt.MapClaims, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		return nil, err
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtRefreshSecret)
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, jwt.ErrInvalidKey
+	}
+
+	return claims, nil
 }

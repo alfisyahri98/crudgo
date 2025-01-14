@@ -11,6 +11,7 @@ type UserRepo interface {
 	CreateUser(user *model.User) error
 	GetAllUsers() ([]*model.User, error)
 	FindByUsername(username string) (*model.User, error)
+	GetUserByUsername(username string) (*model.User, error)
 }
 
 type userRepoImpl struct {
@@ -31,7 +32,7 @@ func (u *userRepoImpl) CreateUser(user *model.User) error {
 	if err := u.db.Create(user).Error; err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -45,8 +46,17 @@ func (u *userRepoImpl) FindByUsername(username string) (*model.User, error) {
 	var user model.User
 	err := u.db.Where("username = ?", username).First(&user).Error
 	if err != nil {
+		return nil, errors.New("username not found")
+	}
+
+	return &user, nil
+}
+
+func (u *userRepoImpl) GetUserByUsername(username string) (*model.User, error) {
+	var user model.User
+	err := u.db.Where("username = ?", username).First(&user).Error
+	if err != nil {
 		if err.Error() == "record not found" {
-			return nil, errors.New("user not found")
 		}
 		return nil, fmt.Errorf("username %s not found", username)
 	}

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"errors"
+	"golang.org/x/crypto/bcrypt"
 	"projectgo/model"
 	"projectgo/repository"
 	"projectgo/utils"
@@ -9,7 +11,8 @@ import (
 type UserService interface {
 	CreateUser(user *model.User) error
 	GetAllUsers() ([]*model.User, error)
-	Login(username, password string) error
+	Login(username, password string) (string, string, error)
+	GetUserByUsername(username string) (*model.User, error)
 }
 
 type UserServiceImpl struct {
@@ -38,15 +41,35 @@ func (u *UserServiceImpl) CreateUser(user *model.User) error {
 func (u *UserServiceImpl) GetAllUsers() ([]*model.User, error) {
 	return u.userRepo.GetAllUsers()
 }
-func (u *UserServiceImpl) Login(username, password string) error {
+
+func (u *UserServiceImpl) Login(username, password string) (string, string, error) {
 	user, err := u.userRepo.FindByUsername(username)
 	if err != nil {
-		return err
+		return "", "", errors.New("user not found")
 	}
 
-	if err := utils.CheckPasswordHash(password, user.Password); err != nil {
-		return err
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
+		return "", "", errors.New("invalid credentials")
 	}
 
-	return nil
+	accesstoken, err := utils.GenerateJWTAccessToken(user.UserID)
+	if err != nil {
+		return "", "", err
+	}
+
+	refreshtoken, err := utils.GenerateJWTRefreshToken(user.UserID)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accesstoken, refreshtoken, nil
+}
+
+func (u *UserServiceImpl) GetUserByUsername(username string) (*model.User, error) {
+	user, err := u.userRepo.FindByUsername(username)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
 }
