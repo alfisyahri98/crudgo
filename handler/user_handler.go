@@ -74,17 +74,25 @@ func (uh *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("access_token", accesstoken, 60*60*24, "/", "", false, true)
-	c.SetCookie("refresh_token", refreshToken, 60*60*24, "/", "", false, true)
+	c.SetCookie("access_token", accesstoken, 5, "/", "", false, true)
+	c.SetCookie("refresh_token", refreshToken, 3600, "/", "", false, true)
 
 	c.JSON(http.StatusOK, utils.Response{
 		Status:  http.StatusOK,
 		Message: "User Logged In",
 		Data: map[string]interface{}{
-			"user_id":       userData.UserID,
-			"access_token":  accesstoken,
-			"refresh_token": refreshToken,
+			"user_id": userData.UserID,
 		},
+	})
+}
+
+func (uh *UserHandler) Logout(c *gin.Context) {
+	c.SetCookie("access_token", "", -1, "/", "", false, true)  // Mengatur cookie dengan durasi -1 untuk menghapusnya
+	c.SetCookie("refresh_token", "", -1, "/", "", false, true) // Mengatur cookie dengan durasi -1 untuk menghapusnya
+
+	c.JSON(http.StatusOK, utils.Response{
+		Status:  http.StatusOK,
+		Message: "User Logged Out",
 	})
 }
 

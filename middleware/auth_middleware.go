@@ -6,21 +6,61 @@ import (
 	"projectgo/utils"
 )
 
-func AuthMiddleware() gin.HandlerFunc {
+func MiddlewareToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokenString, _ := c.Cookie("access_token")
-		if tokenString == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": http.StatusUnauthorized,
-			})
-			c.Abort()
+		accessToken, err := c.Cookie("access_token")
+		if err != nil || accessToken == "" {
+			refreshToken, err := c.Cookie("refresh_token")
+			if err != nil || refreshToken == "" {
+				c.JSON(http.StatusUnauthorized, utils.Response{
+					Status:  http.StatusUnauthorized,
+					Message: "Unauthorized",
+				})
+				c.Abort()
+				return
+			}
+
+			userID, err := utils.ValidateRefreshToken(refreshToken)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, utils.Response{
+					Status:  http.StatusUnauthorized,
+					Message: "Refresh Token Invalid",
+				})
+				c.Abort()
+				return
+			}
+
+			newAccessToken, err := utils.GenerateJWTAccessToken(userID)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, utils.Response{
+					Status:  http.StatusUnauthorized,
+					Message: "Failed Generate New Access Token",
+				})
+				c.Abort()
+				return
+			}
+
+			newRefreshToken, err := utils.GenerateJWTRefreshToken(userID)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, utils.Response{
+					Status:  http.StatusUnauthorized,
+					Message: "Failed Generate New Refresh Token",
+				})
+				c.Abort()
+				return
+			}
+
+			c.SetCookie("access_token", newAccessToken, 10, "", "", false, true)
+			c.SetCookie("refresh_token", newRefreshToken, 3600, "", "", false, true)
+			c.Next()
 			return
 		}
 
-		_, err := utils.ValidateToken(tokenString)
+		_, err = utils.ValidateAccessToken(accessToken)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid token",
+			c.JSON(http.StatusUnauthorized, utils.Response{
+				Status:  http.StatusUnauthorized,
+				Message: "Access Token Invalid",
 			})
 			c.Abort()
 			return
@@ -40,7 +80,7 @@ func CSRFMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		c.SetCookie("csrf_token", csrfToken, 3600, "/", "", false, true)
+		c.SetCookie("csrf_token", csrfToken, 200, "/", "", false, true)
 		c.Next()
 	}
 }
