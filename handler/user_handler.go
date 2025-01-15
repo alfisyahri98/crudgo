@@ -41,11 +41,13 @@ func (uh *UserHandler) Register(c *gin.Context) {
 func (uh *UserHandler) Login(c *gin.Context) {
 	var user model.User
 	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, utils.Response{Status: http.StatusBadRequest, Message: "Invalid JSON Request"})
+		c.JSON(http.StatusBadRequest, utils.Response{
+			Status: http.StatusBadRequest, Message: "Invalid JSON Request",
+		})
 		return
 	}
 
-	userData, err := uh.Service.GetUserByUsername(user.Username)
+	userData, err := uh.Service.GetUserByUsername(user.Username, user.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, utils.Response{
 			Status:  http.StatusInternalServerError,
@@ -54,9 +56,51 @@ func (uh *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
+	accesstoken, err := utils.GenerateJWTAccessToken(userData.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, utils.Response{
+			Status:  http.StatusInternalServerError,
+			Message: "Failed to generate access token",
+		})
+		return
+	}
+
+	refreshToken, err := utils.GenerateJWTRefreshToken(userData.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, utils.Response{
+			Status:  http.StatusInternalServerError,
+			Message: "Failed to generate refresh token",
+		})
+		return
+	}
+
+	c.SetCookie("access_token", accesstoken, 60*60*24, "/", "", false, true)
+	c.SetCookie("refresh_token", refreshToken, 60*60*24, "/", "", false, true)
+
 	c.JSON(http.StatusOK, utils.Response{
 		Status:  http.StatusOK,
 		Message: "User Logged In",
-		Data:    map[string]interface{}{"user_id": userData.UserID, "username": userData.Username},
+		Data: map[string]interface{}{
+			"user_id":       userData.UserID,
+			"access_token":  accesstoken,
+			"refresh_token": refreshToken,
+		},
+	})
+}
+
+func (uh *UserHandler) GetAll(c *gin.Context) {
+	users, err := uh.Service.GetAllUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, utils.Response{
+			Status:  http.StatusInternalServerError,
+			Message: "Failed to get all users",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, utils.Response{
+		Status:  http.StatusOK,
+		Message: "Success",
+		Data:    users,
 	})
 }

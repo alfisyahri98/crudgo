@@ -12,7 +12,7 @@ type UserService interface {
 	CreateUser(user *model.User) error
 	GetAllUsers() ([]*model.User, error)
 	Login(username, password string) (string, string, error)
-	GetUserByUsername(username string) (*model.User, error)
+	GetUserByUsername(username, password string) (*model.User, error)
 }
 
 type UserServiceImpl struct {
@@ -66,10 +66,16 @@ func (u *UserServiceImpl) Login(username, password string) (string, string, erro
 	return accesstoken, refreshtoken, nil
 }
 
-func (u *UserServiceImpl) GetUserByUsername(username string) (*model.User, error) {
+func (u *UserServiceImpl) GetUserByUsername(username, password string) (*model.User, error) {
 	user, err := u.userRepo.FindByUsername(username)
 	if err != nil {
 		return nil, err
 	}
+
+	err = utils.CheckPasswordHash(password, user.Password)
+	if err != nil {
+		return nil, errors.New("invalid credentials")
+	}
+
 	return user, nil
 }
